@@ -1,0 +1,14 @@
+{
+  "name": "Quest — révise ton métier",
+  "short_name": "Quest",
+  "description": "Portail des applis Quest : révision gamifiée pour la formation professionnelle au Québec.",
+  "lang": "fr-CA",
+  "start_url": "index.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#1c2126",
+  "theme_color": "#1c2126",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
