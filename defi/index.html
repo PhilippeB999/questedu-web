@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Défi en direct — Quest</title>
+<meta name="description" content="Rejoins le défi de ta classe avec le code affiché à l'écran." />
+<meta name="theme-color" content="#D42A1C" />
+<link rel="icon" href="../favicon.svg" />
+<style>
+/* ============================================================
+   Défi en direct — écran du joueur (téléphone de l'élève)
+   Aucun nom, aucun compte, rien d'enregistré sur un serveur :
+   le totem vit dans ce navigateur, les réponses passent en direct.
+   ============================================================ */
+:root{
+  --rouge:#D42A1C; --rouge-f:#A81E12; --encre:#1B1614; --texte:#4A423E; --gris:#8C8177;
+  --or:#BF831A; --turq:#3F7A8A; --violet:#6B3FA0; --vert:#2E8B57;
+  --fond:#FAF7F6; --carte:#FFFDF9; --ligne:#E7DFD0; --rose:#FBE7E4; --sable:#F4EFEA;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){ :root{ color-scheme: light; } html,body{ background:#FAF7F6 !important; color:#1B1614 !important; } }
+*{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+html,body{ margin:0; background:var(--fond); color:var(--encre); font-family:"Trebuchet MS", system-ui, sans-serif; }
+body{ min-height:100vh; min-height:100dvh; }
+button,input{ font:inherit; }
+.ecran{ max-width:560px; margin:0 auto; padding:max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)); min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+.haut{ display:flex; align-items:center; gap:10px; font-weight:700; }
+.haut .mk{ width:34px; height:34px; border-radius:10px; background:var(--rouge); color:#fff; display:grid; place-items:center; font-size:18px; }
+.haut .moi{ margin-left:auto; background:var(--rose); color:var(--rouge-f); border-radius:999px; padding:6px 12px; font-size:14px; max-width:60%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.centre{ flex:1; display:flex; flex-direction:column; justify-content:center; text-align:center; gap:14px; }
+h1{ font-size:32px; margin:0; }
+.sur{ font-size:12px; font-weight:700; letter-spacing:3px; color:var(--or); text-transform:uppercase; }
+.muted{ color:var(--gris); }
+.carte{ background:var(--carte); border:1px solid var(--ligne); border-radius:20px; padding:22px; box-shadow:0 2px 10px rgba(27,22,20,.06); }
+.nip{ width:100%; text-align:center; font-size:44px; font-weight:800; letter-spacing:14px; padding:14px; border-radius:16px; border:2px solid var(--ligne); background:#fff; color:var(--encre); }
+.nip:focus{ outline:none; border-color:var(--rouge); }
+.btn{ width:100%; border:0; border-radius:16px; padding:18px; font-weight:700; font-size:20px; background:var(--rouge); color:#fff; }
+.btn:disabled{ opacity:.45; }
+.btn.sec{ background:var(--carte); color:var(--encre); border:1px solid var(--ligne); }
+.erreur{ color:var(--rouge); font-weight:700; }
+.gros{ font-size:72px; line-height:1; }
+.totem{ font-size:28px; font-weight:800; }
+.attente{ display:inline-flex; gap:6px; justify-content:center; }
+.attente i{ width:10px; height:10px; border-radius:50%; background:var(--rouge); animation:saute 1s infinite ease-in-out; }
+.attente i:nth-child(2){ animation-delay:.15s } .attente i:nth-child(3){ animation-delay:.3s }
+@keyframes saute{ 0%,80%,100%{ transform:scale(.5); opacity:.4 } 40%{ transform:scale(1); opacity:1 } }
+.qinfo{ display:flex; justify-content:space-between; align-items:center; margin:14px 0 8px; font-weight:700; color:var(--gris); }
+.temps{ height:8px; border-radius:99px; background:var(--sable); overflow:hidden; }
+.temps div{ height:100%; background:var(--rouge); transition:width .25s linear; }
+.enonce{ font-size:19px; line-height:1.4; font-weight:700; margin:14px 0 16px; white-space:pre-line; }
+.choix{ display:grid; gap:12px; }
+.ch{ display:flex; align-items:center; gap:14px; width:100%; text-align:left; border:0; border-radius:16px; padding:16px; color:#fff; font-weight:700; font-size:17px; min-height:64px; }
+.ch .l{ width:40px; height:40px; border-radius:12px; background:rgba(255,255,255,.22); display:grid; place-items:center; font-size:20px; flex:none; }
+.c0{ background:var(--rouge); } .c1{ background:var(--turq); } .c2{ background:var(--or); } .c3{ background:var(--violet); }
+.ch.choisi{ outline:5px solid var(--encre); outline-offset:2px; }
+.ch.eteint{ opacity:.3; }
+.ch:disabled{ cursor:default; }
+.verdict{ border-radius:24px; padding:28px 20px; color:#fff; }
+.verdict.ok{ background:var(--vert); } .verdict.non{ background:var(--rouge); } .verdict.rien{ background:var(--texte); }
+.verdict .gros{ font-size:64px; }
+.verdict h1{ font-size:30px; margin-top:8px; }
+.verdict p{ margin:8px 0 0; font-size:18px; }
+.rang{ font-size:20px; font-weight:700; }
+.rang b{ color:var(--rouge); font-size:30px; }
+.lien{ background:none; border:0; color:var(--gris); text-decoration:underline; font-size:15px; padding:8px; }
+</style>
+</head>
+<body>
+<div class="ecran" id="app"></div>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const SUPABASE_URL = "https://gejmaxobebsamvfkkpoj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_jqf5eYy0Coka5d0-E86JJQ_bCiQDyvD";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* Mêmes listes que les apps Quest et que l'écran projeté (qui reconstruit le nom à partir des indices). */
+const TOTEM_NOUNS = [["🦊","Renard","Fox","m"],["🦦","Loutre","Otter","f"],["🦫","Castor","Beaver","m"],["🦉","Hibou","Owl","m"],["🦡","Blaireau","Badger","m"],["🐺","Loup","Wolf","m"],["🦅","Aigle","Eagle","m"],["🐿️","Écureuil","Squirrel","m"],["🐗","Sanglier","Boar","m"],["🦔","Hérisson","Hedgehog","m"],["🐻","Ours","Bear","m"],["🦌","Cerf","Stag","m"],["🦆","Canard","Duck","m"],["🐇","Lièvre","Hare","m"],["🐢","Tortue","Turtle","f"],["🐸","Grenouille","Frog","f"],["🐝","Abeille","Bee","f"],["🐜","Fourmi","Ant","f"]];
+const TOTEM_ADJ = [["Vaillant","Vaillante","Valiant"],["Rusé","Rusée","Cunning"],["Débrouillard","Débrouillarde","Resourceful"],["Malin","Maligne","Clever"],["Adroit","Adroite","Deft"],["Curieux","Curieuse","Curious"],["Ingénieux","Ingénieuse","Ingenious"],["Tenace","Tenace","Tenacious"],["Habile","Habile","Skillful"],["Vif","Vive","Quick"],["Futé","Futée","Sharp"],["Astucieux","Astucieuse","Astute"],["Persévérant","Persévérante","Persistent"],["Audacieux","Audacieuse","Bold"],["Minutieux","Minutieuse","Meticulous"],["Agile","Agile","Agile"],["Bricoleur","Bricoleuse","Handy"],["Éveillé","Éveillée","Bright"],["Appliqué","Appliquée","Diligent"],["Costaud","Costaude","Sturdy"]];
+const tirer = () => ({ n: Math.floor(Math.random() * TOTEM_NOUNS.length), a: Math.floor(Math.random() * TOTEM_ADJ.length) });
+function totemDe(t, lang) {
+  const N = TOTEM_NOUNS[t.n], A = TOTEM_ADJ[t.a];
+  return { emoji: N[0], nom: lang === "en" ? `${A[2]} ${N[2]}` : `${N[1]} ${N[3] === "f" ? A[1] : A[0]}` };
+}
+
+const TX = {
+  fr: { titre: "Défi en direct", code: "Entre le code affiché à l'écran", entrer: "Entrer", cherche: "Recherche de la partie…", introuvable: "Aucune partie avec ce code. Vérifie les chiffres à l'écran.", ton: "Ton totem pour cette partie", changer: "Changer de totem", go: "C'est parti !", dedans: "Tu es dans la partie !", regarde: "Regarde l'écran : la première question arrive.", q: (i, n) => `Question ${i} sur ${n}`, envoye: "Réponse envoyée — attends les autres…", recu: "Réponse reçue ✓", trop: "Temps écoulé !", bravo: "Bonne réponse !", non: "Pas cette fois…", rien: "Pas de réponse", pts: (p) => `${p} points au total`, rang: (r, n) => `<b>${r}<sup>${r === 1 ? "er" : "e"}</sup></b> sur ${n}`, fini: "Partie terminée", podium: ["🥇 Tu gagnes le défi !", "🥈 Deuxième place !", "🥉 Troisième place !"], merci: "Bravo pour ta participation !", ferme: "La partie est terminée. Tu peux fermer cette page.", autre: "Rejoindre une autre partie", perdu: "Connexion perdue… on réessaie." },
+  en: { titre: "Live Challenge", code: "Enter the code shown on screen", entrer: "Join", cherche: "Looking for the game…", introuvable: "No game with this code. Check the digits on screen.", ton: "Your totem for this game", changer: "Change totem", go: "Let's go!", dedans: "You're in!", regarde: "Watch the screen: the first question is coming.", q: (i, n) => `Question ${i} of ${n}`, envoye: "Answer sent — waiting for the others…", recu: "Answer received ✓", trop: "Time's up!", bravo: "Correct!", non: "Not this time…", rien: "No answer", pts: (p) => `${p} points in total`, rang: (r, n) => `<b>${r}${r === 1 ? "st" : r === 2 ? "nd" : r === 3 ? "rd" : "th"}</b> of ${n}`, fini: "Game over", podium: ["🥇 You win the challenge!", "🥈 Second place!", "🥉 Third place!"], merci: "Well played!", ferme: "The game is over. You can close this page.", autre: "Join another game", perdu: "Connection lost… retrying." },
+};
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const lire = (k, d) => { try { const v = sessionStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const ecrire = (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+const params = new URLSearchParams(location.search);
+const S = {
+  ecran: "code",          // code · recherche · totem · partie
+  nip: (params.get("pin") || "").replace(/\D/g, "").slice(0, 4),
+  erreur: "", canal: null, hid: null, seq: -1, etat: null,
+  id: null, totem: null, inscrit: false, choix: null, choixI: -1, finLocale: 0,
+  lang: (navigator.language || "fr").startsWith("en") ? "en" : "fr",
+};
+const tx = () => TX[S.etat?.lang || S.lang];
+
+/* ---------------------------------------------------------- canal */
+async function rejoindre(nip) {
+  S.nip = nip; S.erreur = ""; S.ecran = "recherche"; rendre();
+  if (S.canal) { try { await supabase.removeChannel(S.canal); } catch {} }
+  S.hid = null; S.seq = -1; S.etat = null;
+  S.canal = supabase.channel("defi-" + nip, { config: { broadcast: { self: false } } });
+  S.canal.on("broadcast", { event: "etat" }, ({ payload }) => recevoirEtat(payload));
+  S.canal.subscribe((s) => { if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") { S.erreur = tx().perdu; rendre(); } });
+  // L'écran projeté diffuse son état toutes les 1,5 s : sans nouvelles après 5 s, le code est faux.
+  setTimeout(() => { if (!S.etat && S.ecran === "recherche") { S.ecran = "code"; S.erreur = tx().introuvable; rendre(); } }, 5000);
+}
+function recevoirEtat(e) {
+  if (!e || typeof e.seq !== "number") return;
+  if (S.hid && e.hid !== S.hid) return;      // on reste fidèle au premier écran projeté entendu
+  if (!S.hid) S.hid = e.hid;
+  if (e.seq <= S.seq) return;                // messages arrivés dans le désordre
+  S.seq = e.seq;
+  const avant = S.etat; S.etat = e;
+  if (S.ecran === "recherche") {
+    const memo = lire("defi_" + S.nip, null);
+    S.id = memo?.id || Math.random().toString(36).slice(2, 12);
+    S.totem = memo?.totem || tirer();
+    S.ecran = memo ? "partie" : "totem";
+    if (memo) annoncer(); else rendre();
+  }
+  S.inscrit = Array.isArray(e.inscrits) && e.inscrits.includes(S.id);
+  if (S.ecran === "partie" && !S.inscrit) annoncer();   // perdu en route ? on se réannonce
+  if (e.phase === "question") {
+    const nouvelle = !avant || avant.phase !== "question" || avant.q?.i !== e.q.i;
+    if (nouvelle) { S.choix = null; S.choixI = e.q.i; }
+    S.finLocale = Date.now() + e.q.restant;
+    if (S.choix !== null && !(e.repondu || []).includes(S.id)) envoyerReponse();   // réponse perdue : on la renvoie
+  }
+  if (S.ecran === "partie") rendreSiChange();
+}
+let signature = "";
+function rendreSiChange() {
+  const e = S.etat;
+  const sig = [e.phase, e.q?.i, e.r?.i, S.choix, S.inscrit, (e.repondu || []).includes(S.id), e.scores?.[S.id]?.pts, e.lang].join("|");
+  if (sig === signature) return;
+  signature = sig; rendre();
+}
+function annoncer() {
+  if (!S.canal) return;
+  S.canal.send({ type: "broadcast", event: "rejoindre", payload: { id: S.id, n: S.totem.n, a: S.totem.a } });
+}
+function envoyerReponse() {
+  S.canal.send({ type: "broadcast", event: "reponse", payload: { id: S.id, i: S.choixI, c: S.choix } });
+}
+
+/* ---------------------------------------------------------- rendu */
+const $ = document.getElementById("app");
+const haut = () => `<div class="haut"><span class="mk">🎯</span><span>${tx().titre}</span>${S.totem && S.ecran === "partie" ? `<span class="moi">${totemDe(S.totem, S.etat?.lang).emoji} ${esc(totemDe(S.totem, S.etat?.lang).nom)}</span>` : ""}</div>`;
+
+function rendre() {
+  if (S.ecran === "code" || S.ecran === "recherche") return rendreCode();
+  if (S.ecran === "totem") return rendreTotem();
+  const e = S.etat;
+  if (!e) return;
+  if (e.phase === "lobby") return rendreAttente();
+  if (e.phase === "question") return rendreQuestion();
+  if (e.phase === "resultat") return rendreResultat();
+  if (e.phase === "fin") return rendreFin();
+}
+function rendreCode() {
+  const t = tx(); const cherche = S.ecran === "recherche";
+  $.innerHTML = `${haut()}<div class="centre">
+    <div class="gros">🎯</div><h1>${t.titre}</h1><p class="muted" style="margin:0">${t.code}</p>
+    <input class="nip" id="nip" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="${esc(S.nip)}" placeholder="••••" ${cherche ? "disabled" : ""} />
+    ${S.erreur ? `<div class="erreur">${esc(S.erreur)}</div>` : ""}
+    <button class="btn" id="ok" ${S.nip.length === 4 && !cherche ? "" : "disabled"}>${cherche ? t.cherche : t.entrer}</button>
+  </div>`;
+  const inp = $.querySelector("#nip"), ok = $.querySelector("#ok");
+  inp.addEventListener("input", () => { S.nip = inp.value.replace(/\D/g, "").slice(0, 4); inp.value = S.nip; ok.disabled = S.nip.length !== 4; });
+  inp.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && S.nip.length === 4) rejoindre(S.nip); });
+  ok.addEventListener("click", () => rejoindre(S.nip));
+  if (!cherche && !S.nip) inp.focus();
+}
+function rendreTotem() {
+  const t = tx(); const tot = totemDe(S.totem, S.etat?.lang);
+  $.innerHTML = `${haut()}<div class="centre">
+    <div class="sur">${esc(S.etat?.app || "")}</div>
+    <p class="muted" style="margin:0">${t.ton}</p>
+    <div class="carte"><div class="gros">${tot.emoji}</div><div class="totem" style="margin-top:10px">${esc(tot.nom)}</div></div>
+    <button class="btn sec" id="autre">🎲 ${t.changer}</button>
+    <button class="btn" id="go">${t.go}</button>
+  </div>`;
+  $.querySelector("#autre").addEventListener("click", () => { S.totem = tirer(); rendreTotem(); });
+  $.querySelector("#go").addEventListener("click", () => {
+    ecrire("defi_" + S.nip, { id: S.id, totem: S.totem });
+    S.ecran = "partie"; signature = ""; annoncer(); garderEcranAllume(); rendreSiChange();
+  });
+}
+function rendreAttente() {
+  const t = tx(); const tot = totemDe(S.totem, S.etat.lang);
+  $.innerHTML = `${haut()}<div class="centre">
+    <div class="gros">${tot.emoji}</div><div class="totem">${esc(tot.nom)}</div>
+    <h1 style="font-size:26px">${S.inscrit ? t.dedans : t.cherche}</h1>
+    <p class="muted" style="margin:0">${t.regarde}</p>
+    <div class="attente"><i></i><i></i><i></i></div>
+  </div>`;
+}
+function rendreQuestion() {
+  const t = tx(); const q = S.etat.q;
+  const repondu = S.choix !== null; const recu = (S.etat.repondu || []).includes(S.id);
+  $.innerHTML = `${haut()}
+    <div class="qinfo"><span>${t.q(q.i + 1, q.total)}</span><span id="sec"></span></div>
+    <div class="temps"><div id="barre"></div></div>
+    <div class="enonce">${esc(q.texte)}</div>
+    <div class="choix">${q.choix.map((c, k) => `<button class="ch c${k} ${repondu ? (k === S.choix ? "choisi" : "eteint") : ""}" data-k="${k}" ${repondu ? "disabled" : ""}><span class="l">${"ABCD"[k]}</span><span>${esc(c)}</span></button>`).join("")}</div>
+    ${repondu ? `<p class="muted" style="text-align:center;font-weight:700">${recu ? t.recu : t.envoye}</p>` : ""}`;
+  $.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => {
+    if (S.choix !== null || Date.now() > S.finLocale) return;
+    S.choix = Number(b.dataset.k); envoyerReponse();
+    if (navigator.vibrate) navigator.vibrate(30);
+    rendreSiChange();
+  }));
+  tic(q.duree || q.restant);
+}
+let ticId = null;
+function tic(dureeInit) {
+  clearInterval(ticId);
+  const maj = () => {
+    const r = Math.max(0, S.finLocale - Date.now());
+    const b = document.getElementById("barre"), s = document.getElementById("sec");
+    if (!b) return clearInterval(ticId);
+    b.style.width = Math.min(100, (r / Math.max(dureeInit, 1)) * 100) + "%";
+    s.textContent = Math.ceil(r / 1000) + " s";
+    if (r <= 0 && S.choix === null) { $.querySelectorAll("[data-k]").forEach((x) => { x.disabled = true; x.classList.add("eteint"); }); s.textContent = tx().trop; clearInterval(ticId); }
+  };
+  maj(); ticId = setInterval(maj, 250);
+}
+function rendreResultat() {
+  const t = tx(); const e = S.etat; const mon = e.scores?.[S.id];
+  const ok = mon?.ok; const cls = ok === true ? "ok" : ok === false ? "non" : "rien";
+  const bon = e.r.choix[e.r.bon];
+  $.innerHTML = `${haut()}<div class="centre">
+    <div class="verdict ${cls}">
+      <div class="gros">${ok === true ? "✓" : ok === false ? "✗" : "⏱"}</div>
+      <h1>${ok === true ? t.bravo : ok === false ? t.non : t.rien}</h1>
+      ${ok === true ? `<p style="font-size:26px;font-weight:800">+${mon.gain}</p>` : `<p>✓ ${esc(bon)}</p>`}
+    </div>
+    ${mon ? `<div class="rang">${t.rang(mon.rang, e.nbJoueurs)}</div><div class="muted">${t.pts(mon.pts)}</div>` : ""}
+    <div class="attente"><i></i><i></i><i></i></div>
+  </div>`;
+}
+function rendreFin() {
+  const t = tx(); const e = S.etat; const mon = e.scores?.[S.id];
+  const r = mon?.rang;
+  $.innerHTML = `${haut()}<div class="centre">
+    <div class="sur">${t.fini}</div>
+    <div class="gros">${r === 1 ? "🏆" : r && r <= 3 ? "🎉" : "👏"}</div>
+    <h1>${r && r <= 3 ? t.podium[r - 1] : t.merci}</h1>
+    ${mon ? `<div class="rang">${t.rang(r, e.nbJoueurs)}</div><div class="muted">${t.pts(mon.pts)}</div>` : ""}
+    <p class="muted">${t.ferme}</p>
+    <button class="lien" id="autre">${t.autre}</button>
+  </div>`;
+  $.querySelector("#autre").addEventListener("click", () => { S.ecran = "code"; S.nip = ""; S.erreur = ""; signature = ""; rendre(); });
+}
+
+/* Garde l'écran du téléphone allumé pendant la partie (si le navigateur le permet). */
+async function garderEcranAllume() {
+  try { if ("wakeLock" in navigator) { const w = await navigator.wakeLock.request("screen"); document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") garderEcranAllume(); }, { once: true }); return w; } } catch {}
+}
+
+rendre();
+if (S.nip.length === 4) rejoindre(S.nip);
+</script>
+</body>
+</html>
