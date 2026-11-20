@@ -69,7 +69,7 @@ const SUPABASE_KEY = "sb_publishable_jqf5eYy0Coka5d0-E86JJQ_bCiQDyvD";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const CANAL = "vote-affiches";
 
-const STYLES = [["A", "Le téléphone"], ["B", "Le personnage"], ["C", "Le défi"], ["D", "La compétition"]];
+const STYLES = [["A", "Le téléphone"], ["D", "La compétition"], ["E", "Le classement"], ["F", "L'évolution"]];
 const PROGS = [["s", "SASI", "SASIQuest"], ["p", "PAB", "PABQuest"]];
 
 const lire = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
@@ -138,7 +138,7 @@ function rendre() {
   const pret = S.choix.s !== null || S.choix.p !== null;
   app.innerHTML = `${entete()}
     <div class="sur">Vote anonyme · 1 clic</div>
-    <h1>Quelle affiche pour vos élèves ?</h1>
+    <h1>Vote final : quelle affiche ?</h1>
     <p class="muted">Touchez votre préférée. Votez pour votre programme, ou pour les deux.</p>
     ${PROGS.map(([k, pr, nom]) => `
       <section class="prog">
