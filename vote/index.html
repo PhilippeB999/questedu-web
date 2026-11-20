@@ -67,7 +67,7 @@ import { createClient } from "/lib/supabase-2.119.2.esm.js";
 const SUPABASE_URL = "https://gejmaxobebsamvfkkpoj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_jqf5eYy0Coka5d0-E86JJQ_bCiQDyvD";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const CANAL = "vote-affiches";
+const TOUR = "final-2026-11";   // vote final : A, D, E, F (votes enregistrés dans Supabase)
 
 const STYLES = [["A", "Le téléphone"], ["D", "La compétition"], ["E", "Le classement"], ["F", "L'évolution"]];
 const PROGS = [["s", "SASI", "SASIQuest"], ["p", "PAB", "PABQuest"]];
@@ -76,39 +76,28 @@ const lire = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch 
 const ecrire = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
 let id = lire("vote-id");
-if (typeof id !== "string") { id = Math.random().toString(36).slice(2, 10); ecrire("vote-id", id); }
+if (typeof id !== "string" || id.length < 4) { id = Math.random().toString(36).slice(2, 10); ecrire("vote-id", id); }
 
-const sauve = lire("vote-choix") || {};
+let sauve = lire("vote-choix") || {};
+if (sauve.tour !== TOUR) sauve = {};                       // anciens votes (tour précédent) : on repart à zéro
 const S = {
   choix: { s: sauve.s ?? null, p: sauve.p ?? null },
   envoye: !!sauve.envoye,
-  tour: sauve.tour ?? null,     // tour de vote de l'écran projeté (« Recommencer » en crée un nouveau)
-  recu: false, hote: false, ouvert: true, hid: null,
+  recu: !!sauve.recu, erreur: "", ouvert: true,
 };
-const garder = () => ecrire("vote-choix", { s: S.choix.s, p: S.choix.p, envoye: S.envoye, tour: S.tour });
+const garder = () => ecrire("vote-choix", { s: S.choix.s, p: S.choix.p, envoye: S.envoye, recu: S.recu, tour: TOUR });
 
-/* ---------------------------------------------------------- temps réel */
-const canal = supabase.channel(CANAL, { config: { broadcast: { self: false } } });
-canal.on("broadcast", { event: "etat" }, ({ payload: e }) => {
-  if (!e || typeof e.tour !== "string" || typeof e.hid !== "string") return;
-  if (S.hid && e.hid !== S.hid) return;                  // on suit le premier écran entendu (un 2e onglet ouvert ailleurs est ignoré)
-  S.hid = e.hid;
-  const avantHote = S.hote, avantOuvert = S.ouvert;
-  let raz = false;
-  S.hote = true; S.ouvert = !!e.ouvert;
-  if (S.tour !== null && S.tour !== e.tour) {           // l'écran a recommencé le vote : on repart à zéro
-    S.choix = { s: null, p: null }; S.envoye = false; raz = true;
-  }
-  S.tour = e.tour; garder();
-  const avant = S.recu;
-  S.recu = Array.isArray(e.recus) && e.recus.includes(id);
-  if (S.envoye && !S.recu && S.ouvert) envoyer();        // message perdu ou écran rechargé : on renvoie
-  if (raz || avantOuvert !== S.ouvert || (S.envoye && avant !== S.recu)) rendre(); else if (!avantHote) rendreStatut();
-});
-canal.subscribe();
-
-function envoyer() {
-  canal.send({ type: "broadcast", event: "vote", payload: { id, s: S.choix.s, p: S.choix.p } });
+/* ---------------------------------------------------------- enregistrement
+   Chaque vote est ENREGISTRÉ (fonction voter_affiche) : plus besoin que l'écran
+   des résultats soit ouvert. Un vote par téléphone ; le dernier remplace. */
+async function envoyer() {
+  S.erreur = ""; rendreStatut();
+  const { data, error } = await supabase.rpc("voter_affiche", { p_tour: TOUR, p_votant: id, p_s: S.choix.s, p_p: S.choix.p });
+  if (error) { S.recu = false; S.erreur = "Le vote n'a pas pu être envoyé. Vérifiez votre connexion, puis réessayez."; }
+  else if (data === "ferme") { S.recu = false; S.ouvert = false; }
+  else if (data === "ok") { S.recu = true; }
+  else { S.recu = false; S.erreur = "Le vote n'a pas pu être enregistré."; }
+  garder(); rendre();
 }
 
 /* ---------------------------------------------------------- affichage */
@@ -116,8 +105,8 @@ const app = document.getElementById("app");
 const img = (st, pr) => `${st}-${pr}.jpg`;
 
 function rendre() {
-  if (S.hote && !S.ouvert && !S.envoye) {
-    app.innerHTML = `${entete()}<div class="ferme"><div style="font-size:64px">🗳️</div><h1>Le vote est terminé</h1><p class="muted">Merci ! Les résultats sont à l'écran.</p></div>`;
+  if (!S.ouvert) {
+    app.innerHTML = `${entete()}<div class="ferme"><div style="font-size:64px">🗳️</div><h1>Le vote est terminé</h1><p class="muted">Merci ! Philippe vous communiquera l'affiche gagnante.</p></div>`;
     return;
   }
   if (S.envoye) {
@@ -158,13 +147,14 @@ function rendre() {
     S.choix[k] = S.choix[k] === i ? null : i; garder(); rendre();
   });
   app.querySelectorAll(".loupe").forEach((b) => b.onclick = () => zoom(b.dataset.z));
-  document.getElementById("go").onclick = () => { S.envoye = true; S.recu = false; garder(); envoyer(); rendre(); };
+  document.getElementById("go").onclick = () => { S.envoye = true; S.recu = false; garder(); rendre(); envoyer(); };
 }
 function entete() { return `<div class="haut"><div class="mk">Q</div><span>Quest · CFP L'Envol</span></div>`; }
 function rendreStatut() {
   const el = document.getElementById("statut"); if (!el) return;
-  if (S.recu) { el.className = "statut ok"; el.textContent = "✓ Vote reçu à l'écran"; }
-  else { el.className = "statut att"; el.textContent = S.hote ? "Envoi en cours…" : "En attente de l'écran projeté… Gardez cette page ouverte."; }
+  if (S.recu) { el.className = "statut ok"; el.textContent = "✓ Vote enregistré. Vous pouvez fermer la page."; }
+  else if (S.erreur) { el.className = "statut att"; el.innerHTML = S.erreur + ' <button class="btn sec" id="reessai" style="margin-top:10px">Réessayer</button>'; document.getElementById("reessai").onclick = envoyer; }
+  else { el.className = "statut att"; el.textContent = "Envoi en cours…"; }
 }
 function zoom(src) {
   const z = document.getElementById("zoom");
@@ -172,7 +162,7 @@ function zoom(src) {
   z.querySelector("button").onclick = () => z.innerHTML = "";
   z.querySelector(".zoom").onclick = (e) => { if (e.target.classList.contains("zoom")) z.innerHTML = ""; };
 }
-document.addEventListener("visibilitychange", () => { if (!document.hidden && S.envoye) envoyer(); });
+if (S.envoye && !S.recu) envoyer();   // vote resté en suspens (page fermée trop tôt) : on le renvoie
 rendre();
 </script>
 </body>
