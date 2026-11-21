@@ -86,8 +86,8 @@ function totemDe(t, lang) {
 }
 
 const TX = {
-  fr: { titre: "Défi en direct", code: "Entre le code affiché à l'écran", entrer: "Entrer", cherche: "Recherche de la partie…", introuvable: "Aucune partie avec ce code. Vérifie les chiffres à l'écran.", ton: "Ton totem pour cette partie", changer: "Changer de totem", go: "C'est parti !", dedans: "Tu es dans la partie !", regarde: "Regarde l'écran : la première question arrive.", q: (i, n) => `Question ${i} sur ${n}`, envoye: "Réponse envoyée — attends les autres…", recu: "Réponse reçue ✓", trop: "Temps écoulé !", bravo: "Bonne réponse !", non: "Pas cette fois…", rien: "Pas de réponse", pts: (p) => `${p} points au total`, rang: (r, n) => `<b>${r}<sup>${r === 1 ? "er" : "e"}</sup></b> sur ${n}`, fini: "Partie terminée", podium: ["🥇 Tu gagnes le défi !", "🥈 Deuxième place !", "🥉 Troisième place !"], merci: "Bravo pour ta participation !", ferme: "La partie est terminée. Tu peux fermer cette page.", autre: "Rejoindre une autre partie", perdu: "Connexion perdue… on réessaie." },
-  en: { titre: "Live Challenge", code: "Enter the code shown on screen", entrer: "Join", cherche: "Looking for the game…", introuvable: "No game with this code. Check the digits on screen.", ton: "Your totem for this game", changer: "Change totem", go: "Let's go!", dedans: "You're in!", regarde: "Watch the screen: the first question is coming.", q: (i, n) => `Question ${i} of ${n}`, envoye: "Answer sent — waiting for the others…", recu: "Answer received ✓", trop: "Time's up!", bravo: "Correct!", non: "Not this time…", rien: "No answer", pts: (p) => `${p} points in total`, rang: (r, n) => `<b>${r}${r === 1 ? "st" : r === 2 ? "nd" : r === 3 ? "rd" : "th"}</b> of ${n}`, fini: "Game over", podium: ["🥇 You win the challenge!", "🥈 Second place!", "🥉 Third place!"], merci: "Well played!", ferme: "The game is over. You can close this page.", autre: "Join another game", perdu: "Connection lost… retrying." },
+  fr: { titre: "Défi en direct", code: "Entre le code affiché à l'écran", entrer: "Entrer", cherche: "Recherche de la partie…", introuvable: "Aucune partie avec ce code. Vérifie les chiffres à l'écran.", ton: "Ton totem pour cette partie", changer: "Changer de totem", go: "C'est parti !", dedans: "Tu es dans la partie !", regarde: "Regarde l'écran : la première question arrive.", q: (i, n) => `Question ${i} sur ${n}`, envoye: "Réponse envoyée — attends les autres…", recu: "Réponse reçue ✓", trop: "Temps écoulé !", bravo: "Bonne réponse !", non: "Pas cette fois…", rien: "Pas de réponse", pts: (p) => `${p} points au total`, rang: (r, n) => `<b>${r}<sup>${r === 1 ? "er" : "e"}</sup></b> sur ${n}`, fini: "Partie terminée", podium: ["🥇 Tu gagnes le défi !", "🥈 Deuxième place !", "🥉 Troisième place !"], merci: "Bravo pour ta participation !", suspense: "Regarde l'écran !", suspense2: "Le podium se dévoile…", ferme: "La partie est terminée. Tu peux fermer cette page.", autre: "Rejoindre une autre partie", perdu: "Connexion perdue… on réessaie." },
+  en: { titre: "Live Challenge", code: "Enter the code shown on screen", entrer: "Join", cherche: "Looking for the game…", introuvable: "No game with this code. Check the digits on screen.", ton: "Your totem for this game", changer: "Change totem", go: "Let's go!", dedans: "You're in!", regarde: "Watch the screen: the first question is coming.", q: (i, n) => `Question ${i} of ${n}`, envoye: "Answer sent — waiting for the others…", recu: "Answer received ✓", trop: "Time's up!", bravo: "Correct!", non: "Not this time…", rien: "No answer", pts: (p) => `${p} points in total`, rang: (r, n) => `<b>${r}${r === 1 ? "st" : r === 2 ? "nd" : r === 3 ? "rd" : "th"}</b> of ${n}`, fini: "Game over", podium: ["🥇 You win the challenge!", "🥈 Second place!", "🥉 Third place!"], merci: "Well played!", suspense: "Watch the screen!", suspense2: "The podium is being revealed…", ferme: "The game is over. You can close this page.", autre: "Join another game", perdu: "Connection lost… retrying." },
 };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 const lire = (k, d) => { try { const v = sessionStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
@@ -141,7 +141,7 @@ function recevoirEtat(e) {
 let signature = "";
 function rendreSiChange() {
   const e = S.etat;
-  const sig = [e.phase, e.q?.i, e.r?.i, S.choix, S.inscrit, (e.repondu || []).includes(S.id), e.scores?.[S.id]?.pts, e.lang].join("|");
+  const sig = [e.phase, e.q?.i, e.r?.i, S.choix, S.inscrit, (e.repondu || []).includes(S.id), e.scores?.[S.id]?.pts, e.lang, !!e.suspense].join("|");
   if (sig === signature) return;
   signature = sig; rendre();
 }
@@ -251,6 +251,11 @@ function rendreResultat() {
 }
 function rendreFin() {
   const t = tx(); const e = S.etat; const mon = e.scores?.[S.id];
+  // Pendant que le podium se dévoile au projecteur, on garde la surprise.
+  if (e.suspense) {
+    $.innerHTML = `${haut()}<div class="centre"><div class="sur">${t.fini}</div><div class="gros">🥁</div><h1>${t.suspense}</h1><p class="muted">${t.suspense2}</p></div>`;
+    return;
+  }
   const r = mon?.rang;
   $.innerHTML = `${haut()}<div class="centre">
     <div class="sur">${t.fini}</div>
